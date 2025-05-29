@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.signal import detrend, windows
 
 """
-ask Description 3
+Task Description 3
 
 In this exercise, you will implement feature extraction techniques for time-series welding data and create visualizations to analyze these features. You'll extract statistical and frequency-domain features from the welding signals and create plots to explore relationships between these features.
 
@@ -58,14 +58,14 @@ def find_dominant_frequencies(x: np.ndarray, fs: int) -> np.ndarray:
     num_samples, seq_len = x.shape
     dominant_freqs = np.zeros(num_samples)
     freqs = np.fft.rfftfreq(seq_len, d=1/fs)
-    window = windows.hann(seq_len)
+    window = windows.hann(seq_len) 
 
     for i in range(num_samples):
-        signal = detrend(x[i])
-        windowed = signal * window
-        fft_vals = np.fft.rfft(windowed)
-        psd = np.abs(fft_vals)**2
-        idx = np.argmax(psd[1:]) + 1
+        signal = detrend(x[i]) #Detrending
+        windowed = signal * window #windowing
+        fft_vals = np.fft.rfft(windowed) #Fast Fourier Transform
+        psd = np.abs(fft_vals)**2 #Power Spectral Density
+        idx = np.argmax(psd[1:]) + 1 
         dominant_freqs[i] = freqs[idx]
 
     return dominant_freqs

@@ -19,7 +19,7 @@ class MyKMeans:
         distance_metric: DISTANCE_METRICS = "euclidean",
         init_method: INIT_METHOD = "kmeans++"
     ):
-        # Validate parameters
+        # Validiern der Parameter
         if distance_metric not in ("euclidean", "manhattan", "dtw"):
             raise ValueError(f"Invalid distance metric: {distance_metric}")
         if init_method not in ("random", "kmeans++"):
@@ -36,7 +36,7 @@ class MyKMeans:
         """
         Train the K-means model on 2D or 3D input data.
         """
-        # Convert pandas DataFrame
+        # Konvertieren in pandas DataFrame
         if isinstance(x, pd.DataFrame):
             x = x.values
         if not isinstance(x, np.ndarray):
@@ -44,27 +44,27 @@ class MyKMeans:
         if x.ndim not in (2, 3):
             raise ValueError("Input data must be a 2D or 3D array")
 
-        # Initialize centroids
+        # Initialisiere centroids
         self.centroids = self._initialize_centroids(x)
         prev_centroids = None
 
         # Main K-means loop
         for it in tqdm(range(self.max_iter), desc="KMeans fitting"):
-            # Compute distances and assign labels
+            # Bestimme Distanzen und setze die Labels
             distances = self._compute_distance(x, self.centroids)
             labels = np.argmin(distances, axis=1)
 
-            # Recompute centroids
+            # Neu berechnen der centroids
             new_centroids = np.zeros_like(self.centroids)
             for ci in range(self.k):
                 members = x[labels == ci]
                 if members.size == 0:
-                    # Empty cluster: reinitialize
+                    # Reinitialisierung bei leerem Cluster
                     new_centroids[ci] = x[np.random.randint(len(x))]
                 else:
                     new_centroids[ci] = members.mean(axis=0)
 
-            # Check convergence
+            # Konvergenz Check
             if prev_centroids is not None and np.allclose(prev_centroids, new_centroids):
                 logging.info(f"Converged at iteration {it}")
                 break
@@ -72,7 +72,7 @@ class MyKMeans:
             prev_centroids = self.centroids.copy()
             self.centroids = new_centroids
 
-        # Compute inertia (sum of squared distances)
+        
         final_dist = self._compute_distance(x, self.centroids)
         self.inertia_ = np.sum(np.min(final_dist, axis=1) ** 2)
         return self
@@ -109,10 +109,10 @@ class MyKMeans:
             indices = np.random.choice(n_samples, self.k, replace=False)
             return x[indices]
 
-        # k-means++ initialization
-        # 1) first centroid randomly
+        # k-means++ Initialisierung
+        # Erster centroid zufällig
         centroids[0] = x[np.random.randint(n_samples)]
-        # 2) remaining centroids
+        # Setzen der anderen centroids
         for i in range(1, self.k):
             dist = self._compute_distance(x, centroids[:i])
             sq = np.min(dist, axis=1) ** 2
@@ -151,7 +151,6 @@ class MyKMeans:
             if sample.ndim == 1:
                 dist[i] = dtw.distance(sample, c)
             else:
-                # Multivariate time-series: sum across features
                 total = 0
                 for feat in range(sample.shape[1]):
                     total += dtw.distance(sample[:, feat], c[:, feat])
