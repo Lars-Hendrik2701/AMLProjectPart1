@@ -7,15 +7,15 @@
     <div class="controls">
         <label for="sample-selector">Select Welding Sample: </label>
         <select id="sample-selector" onchange="updateWeldingSample()">
-            <option value="0">Sample 0</option>
             <option value="1">Sample 1</option>
             <option value="2">Sample 2</option>
             <option value="3">Sample 3</option>
             <option value="4">Sample 4</option>
+            <option value="5">Sample 5</option>
         </select>
     </div>
     
-    <img id="welding-sample-img" src="plots/ex_01_plots/welding_sample_0.png" alt="Welding Sample Analysis" class="plot-image">
+    <img id="welding-sample-img" src="plots/ex_02/welding_sample_1.png" alt="Welding Sample Analysis" class="plot-image">
 </div>
 
 <script>
@@ -23,7 +23,7 @@
         const selector = document.getElementById('sample-selector');
         const sampleNumber = selector.value;
         const imgElement = document.getElementById('welding-sample-img');
-        imgElement.src = `plots/ex_01_plots/welding_sample_${sampleNumber}.png`;
+        imgElement.src = `plots/ex_02/welding_sample_${sampleNumber}.png`;
         imgElement.alt = `Welding Sample ${sampleNumber} Analysis`;
     }
 </script> 
