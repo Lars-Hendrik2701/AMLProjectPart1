@@ -88,16 +88,15 @@ def extract_features(
         pd.DataFrame: DataFrame of shape (num_samples, num_features+1) including 'label'.
     """
     num_samples, seq_len, feat_dim = data.shape
-    # Separate channels: 0=current, 1=voltage
+    # Separieren der Kanäle: 0=current, 1=voltage
     current = data[:, :, 0]
     voltage = data[:, :, 1]
 
-    # Preallocate feature dict
     features = {
         'label': labels
     }
 
-    # Statistical features
+    # Statistik
     for name, arr in [('current', current), ('voltage', voltage)]:
         features[f'{name}_mean'] = arr.mean(axis=1)
         features[f'{name}_std'] = arr.std(axis=1, ddof=1)
@@ -107,12 +106,11 @@ def extract_features(
         features[f'{name}_range'] = features[f'{name}_max'] - features[f'{name}_min']
         features[f'{name}_rms'] = np.sqrt((arr**2).mean(axis=1))
 
-    # Frequency-domain features
-    # dominant frequencies of each channel
+    # Bestimmen der dominanten Frequenzen
     features['current_dom_freq'] = find_dominant_frequencies(current, fs)
     features['voltage_dom_freq'] = find_dominant_frequencies(voltage, fs)
 
-    # Power-related features (instantaneous power = voltage * current)
+    # Leistungsstatistik
     power = voltage * current
     features['power_mean'] = power.mean(axis=1)
     features['power_std'] = power.std(axis=1, ddof=1)

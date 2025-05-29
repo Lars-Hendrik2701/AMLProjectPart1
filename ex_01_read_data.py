@@ -7,8 +7,10 @@ def load_data(data_path: Path) -> pd.DataFrame:
     """
     Load and preprocess data from a CSV file. Remove rows with unlabeled data.
     """
+    #Check existence
     if not data_path.exists():
         raise FileNotFoundError(f"Data file not found: {data_path}")
+    
     df = pd.read_csv(data_path)
     df = remove_unlabeled_data(df)
     df = df.dropna().reset_index(drop=True)
@@ -21,8 +23,10 @@ def remove_unlabeled_data(data: pd.DataFrame) -> pd.DataFrame:
     """
     Remove rows with unlabeled data (where labels == -1).
     """
+    #Check Labels
     if 'labels' not in data.columns:
         raise KeyError("Input DataFrame must contain a 'labels' column.")
+    
     return data[data['labels'] != -1].reset_index(drop=True)
 
 
@@ -34,10 +38,12 @@ def convert_to_np(data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarra
     for col in ('labels', 'exp_ids'):
         if col not in data.columns:
             raise KeyError(f"Missing required column: {col}")
+    
+    #Numpy Conversion
     labels = data['labels'].to_numpy()
     exp_ids = data['exp_ids'].to_numpy()
 
-    # Identify and sort feature columns
+    # Identify and sort feature columns to ensure time correctness
     current_cols = sorted([c for c in data.columns if c.startswith('I')])
     voltage_cols = sorted([c for c in data.columns if c.startswith('V')])
     if not current_cols or not voltage_cols:
@@ -48,7 +54,7 @@ def convert_to_np(data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarra
     if currents.shape[1] != voltages.shape[1]:
         raise ValueError("Mismatch in number of timesteps between currents and voltages.")
 
-    # Stack last axis: currents and voltages are two feature-dimensions
+    # Combining current and voltages at the last index (-1)
     combined = np.stack((currents, voltages), axis=-1)
     return labels, exp_ids, combined
 
@@ -57,7 +63,10 @@ def create_sliding_windows_first_dim(data: np.ndarray, sequence_length: int) -> 
     """
     Create sliding windows over the sample dimension: output shape (n_windows, seq_len, timesteps, features).
     """
+    #use exitisting library for sliding window
     from numpy.lib.stride_tricks import sliding_window_view
+
+    #3 Dimensions: n_samples, window_size/timesteps and n_channels (2)
     if data.ndim != 3:
         raise ValueError("Input data must be 3D.")
     n_samples, timesteps, features = data.shape
@@ -102,7 +111,7 @@ def get_welding_data(
         seq_exp = []
         for start in range(n_windows):
             window = data[start:start+sequence_length]  # shape (sequence_length, timesteps, features)
-            # flatten sequence and time dims
+            # flatten sequence and time dims to allow 2D shape
             flattened = window.reshape(sequence_length * timesteps, features)
             seq_data.append(flattened)
             seq_labels.append(labels[start:start+sequence_length])
