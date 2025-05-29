@@ -5,37 +5,6 @@ from tqdm import tqdm
 from dtaidistance import dtw
 from typing import Literal
 
-"""
-ask Description 4
-
-In this exercise, you will implement a custom K-means clustering algorithm from scratch that supports multiple distance metrics. K-means is one of the most popular clustering algorithms used to partition data into K distinct, non-overlapping clusters.
-
-Tasks:
-Exercise 4.1:
-
-Implement a MyKMeans class in ex_04_my_kmeans.py with the following functionality:
-
-    - Support for different distance metrics: Euclidean, Manhattan, and Dynamic Time Warping (DTW). For DTW, use the dtaidistance library.
-    - Support for different initialization methods: random and k-means++.
-    - Ability to handle both 2D data (standard feature vectors) and 3D data (time series with multiple features).
-
-Your implementation should include:
-    - __init__ method to initialize parameters.
-    - fit method to train the model on input data.
-    - predict method to assign new data points to clusters.
-    - fit_predict method to combine fitting and prediction.
-    - Proper handling of convergence and tracking of inertia (sum of distances to nearest centroid).
-
-Make sure your implementation can:
-    - Accept both NumPy arrays and Pandas DataFrames as input.
-    - Show progress during training using tqdm.
-    - Handle edge cases like empty clusters.
-
-Initialization Step for k-means++:
-    1. Choose the first cluster center randomly from the data points.
-    2. For each remaining cluster center, select the next center based on probability proportional to the square of the distance to the closest selected center.
-"""
-
 DISTANCE_METRICS = Literal["euclidean", "manhattan", "dtw"]
 INIT_METHOD = Literal["random", "kmeans++"]
 
@@ -43,141 +12,148 @@ class MyKMeans:
     """
     Custom K-means clustering implementation with support for multiple distance metrics.
     """
-    def __init__(self, k: int, max_iter: int = 100,
-                 distance_metric: DISTANCE_METRICS = "euclidean",
-                 init_method: INIT_METHOD = "kmeans++"):
-        # Store parameters
+    def __init__(
+        self,
+        k: int,
+        max_iter: int = 100,
+        distance_metric: DISTANCE_METRICS = "euclidean",
+        init_method: INIT_METHOD = "kmeans++"
+    ):
+        # Validate parameters
+        if distance_metric not in ("euclidean", "manhattan", "dtw"):
+            raise ValueError(f"Invalid distance metric: {distance_metric}")
+        if init_method not in ("random", "kmeans++"):
+            raise ValueError(f"Invalid init method: {init_method}")
+
         self.k = k
         self.max_iter = max_iter
         self.distance_metric = distance_metric
         self.init_method = init_method
-        self.centroids = None
-        self.inertia_ = None
+        self.centroids: np.ndarray | None = None
+        self.inertia_: float | None = None
 
     def fit(self, x: np.ndarray | pd.DataFrame):
         """
-        Train the K-means model: initialize centroids and iterate update steps until convergence.
+        Train the K-means model on 2D or 3D input data.
         """
-        # Convert DataFrame to numpy array if needed
+        # Convert pandas DataFrame
         if isinstance(x, pd.DataFrame):
             x = x.values
-        elif not isinstance(x, np.ndarray):
-            raise ValueError("Input data must be a numpy array or pandas DataFrame")
+        if not isinstance(x, np.ndarray):
+            raise ValueError("Input data must be a numpy array or a pandas DataFrame")
+        if x.ndim not in (2, 3):
+            raise ValueError("Input data must be a 2D or 3D array")
 
         # Initialize centroids
         self.centroids = self._initialize_centroids(x)
         prev_centroids = None
 
-        # Iterate the K-means clustering process
-        for iteration in tqdm(range(self.max_iter), desc="KMeans fitting"):  # progress bar
-            # Compute distance matrix between points and centroids
+        # Main K-means loop
+        for it in tqdm(range(self.max_iter), desc="KMeans fitting"):
+            # Compute distances and assign labels
             distances = self._compute_distance(x, self.centroids)
-            # Assign each point to the nearest centroid
             labels = np.argmin(distances, axis=1)
-            # Recompute centroids as mean of assigned points
-            new_centroids = np.zeros_like(self.centroids)
-            for cluster in range(self.k):
-                points = x[labels == cluster]
-                if len(points) == 0:
-                    # Handle empty cluster by reinitializing to a random point
-                    new_centroids[cluster] = x[np.random.randint(0, x.shape[0])]
-                else:
-                    new_centroids[cluster] = np.mean(points, axis=0)
 
-            # Check for convergence (no change in centroids)
-            if prev_centroids is not None and np.allclose(new_centroids, prev_centroids):
-                logging.info(f"Converged at iteration {iteration}")
+            # Recompute centroids
+            new_centroids = np.zeros_like(self.centroids)
+            for ci in range(self.k):
+                members = x[labels == ci]
+                if members.size == 0:
+                    # Empty cluster: reinitialize
+                    new_centroids[ci] = x[np.random.randint(len(x))]
+                else:
+                    new_centroids[ci] = members.mean(axis=0)
+
+            # Check convergence
+            if prev_centroids is not None and np.allclose(prev_centroids, new_centroids):
+                logging.info(f"Converged at iteration {it}")
                 break
 
-            prev_centroids = self.centroids
+            prev_centroids = self.centroids.copy()
             self.centroids = new_centroids
 
-        # After convergence, compute final inertia (sum of squared distances)
-        final_distances = self._compute_distance(x, self.centroids)
-        closest_dist = np.min(final_distances, axis=1)
-        self.inertia_ = np.sum(closest_dist**2)
+        # Compute inertia (sum of squared distances)
+        final_dist = self._compute_distance(x, self.centroids)
+        self.inertia_ = np.sum(np.min(final_dist, axis=1) ** 2)
         return self
 
-    def fit_predict(self, x: np.ndarray | pd.DataFrame):
+    def predict(self, x: np.ndarray | pd.DataFrame) -> np.ndarray:
         """
-        Convenience method: fit model and return cluster assignments.
-        """
-        self.fit(x)
-        return self.predict(x)
-
-    def predict(self, x: np.ndarray | pd.DataFrame):
-        """
-        Assign new data points to the nearest centroid.
+        Assign new samples to the nearest centroid.
         """
         if isinstance(x, pd.DataFrame):
             x = x.values
+        if self.centroids is None:
+            raise ValueError("Model has not been fitted yet")
+        if not isinstance(x, np.ndarray) or x.ndim not in (2, 3):
+            raise ValueError("Input data must be a 2D or 3D array")
+
         distances = self._compute_distance(x, self.centroids)
         return np.argmin(distances, axis=1)
 
+    def fit_predict(self, x: np.ndarray | pd.DataFrame) -> np.ndarray:
+        """
+        Convenience: fit model and return labels.
+        """
+        return self.fit(x).predict(x)
+
     def _initialize_centroids(self, x: np.ndarray) -> np.ndarray:
         """
-        Initialize centroids using random selection or KMeans++ algorithm.
+        Initialize centroids using random or k-means++.
         """
         n_samples = x.shape[0]
-        centroids = np.zeros((self.k, *x.shape[1:]))  # support 2D or 3D points
+        shape = (self.k, *x.shape[1:])
+        centroids = np.zeros(shape)
 
         if self.init_method == "random":
-            # Randomly sample k unique points
             indices = np.random.choice(n_samples, self.k, replace=False)
-            centroids = x[indices]
+            return x[indices]
 
-        else:  # kmeans++ initialization
-            # 1) Pick one center uniformly at random
-            centroids[0] = x[np.random.randint(0, n_samples)]
-            # 2) For each subsequent centroid
-            for i in range(1, self.k):
-                # Compute distances to nearest existing centroid
-                dist_sq = np.min(self._compute_distance(x, centroids[:i])**2, axis=1)
-                # Probability proportional to squared distance
-                prob = dist_sq / np.sum(dist_sq)
-                # Choose next centroid
-                next_idx = np.random.choice(n_samples, p=prob)
-                centroids[i] = x[next_idx]
-
+        # k-means++ initialization
+        # 1) first centroid randomly
+        centroids[0] = x[np.random.randint(n_samples)]
+        # 2) remaining centroids
+        for i in range(1, self.k):
+            dist = self._compute_distance(x, centroids[:i])
+            sq = np.min(dist, axis=1) ** 2
+            prob = sq / np.sum(sq)
+            idx = np.random.choice(n_samples, p=prob)
+            centroids[i] = x[idx]
         return centroids
 
     def _compute_distance(self, x: np.ndarray, centroids: np.ndarray) -> np.ndarray:
         """
-        Compute distance matrix between data points and centroids using the selected metric.
-        Supports Euclidean, Manhattan, and DTW metrics, and handles 2D or 3D data.
+        Compute a distance matrix between each sample and each centroid.
+        Supports Euclidean, Manhattan, DTW.
         """
         n_samples = x.shape[0]
-        distances = np.zeros((n_samples, self.k))
+        n_centroids = centroids.shape[0]
+        distances = np.zeros((n_samples, n_centroids))
 
-        for idx in range(self.k):
-            c = centroids[idx]
+        for j in range(n_centroids):
+            c = centroids[j]
             if self.distance_metric == "euclidean":
-                # Flatten if time-series
-                distances[:, idx] = np.linalg.norm(x - c, axis=tuple(range(1, x.ndim)))
+                distances[:, j] = np.linalg.norm(x - c, axis=tuple(range(1, x.ndim)))
             elif self.distance_metric == "manhattan":
-                distances[:, idx] = np.sum(np.abs(x - c), axis=tuple(range(1, x.ndim)))
-            else:  # dtw
-                distances[:, idx] = self._dtw(x, c)
-
+                distances[:, j] = np.sum(np.abs(x - c), axis=tuple(range(1, x.ndim)))
+            else:
+                distances[:, j] = self._dtw(x, c)
         return distances
 
-    def _dtw(self, x: np.ndarray, centroid: np.ndarray) -> np.ndarray:
+    def _dtw(self, x: np.ndarray, c: np.ndarray) -> np.ndarray:
         """
-        Compute DTW distance between each sample and a single centroid.
+        Compute DTW distance between each sample and centroid c.
         """
         n_samples = x.shape[0]
         dist = np.zeros(n_samples)
-        # For each sample, compute DTW distance to centroid
         for i in range(n_samples):
-            # dtaidistance.dtw.distance expects 1D sequences; handle multivariate by summing per-feature
-            if x.ndim == 2:
-                # 1D data: direct DTW
-                dist[i] = dtw.distance(x[i], centroid)
+            sample = x[i]
+            if sample.ndim == 1:
+                dist[i] = dtw.distance(sample, c)
             else:
-                # 3D/time-series: sum DTW over each feature dimension
-                # reshape centroid to (timesteps, features)
-                dist_sum = 0
-                for feat in range(x.shape[2]):
-                    dist_sum += dtw.distance(x[i, :, feat], centroid[:, feat])
-                dist[i] = dist_sum
+                # Multivariate time-series: sum across features
+                total = 0
+                for feat in range(sample.shape[1]):
+                    total += dtw.distance(sample[:, feat], c[:, feat])
+                dist[i] = total
         return dist
